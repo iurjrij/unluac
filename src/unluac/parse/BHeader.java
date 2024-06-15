@@ -1,20 +1,18 @@
 package unluac.parse;
 
 import java.nio.ByteBuffer;
-
 import unluac.Configuration;
 import unluac.Version;
 import unluac.decompile.CodeExtract;
-
 
 public class BHeader {
 
   private static final byte[] signature = {
     0x1B, 0x4C, 0x75, 0x61,
   };
-  
+
   public final boolean debug = false;
-  
+
   public final Configuration config;
   public final Version version;
   public final LHeader lheader;
@@ -30,21 +28,21 @@ public class BHeader {
   public final LUpvalueType upvalue;
   public final LFunctionType function;
   public final CodeExtract extractor;
-  
+
   public final LFunction main;
-  
+  private int instructionSize;  // Field to store the instruction size
+
   public BHeader(ByteBuffer buffer, Configuration config) {
     this.config = config;
     // 4 byte Lua signature
-    for(int i = 0; i < signature.length; i++) {
-      if(buffer.get() != signature[i]) {
+    for (int i = 0; i < signature.length; i++) {
+      if (buffer.get() != signature[i]) {
         throw new IllegalStateException("The input file does not have the signature of a valid Lua file.");
       }
     }
     // 1 byte Lua version
     int versionNumber = 0xFF & buffer.get();
-    switch(versionNumber)
-    {
+    switch (versionNumber) {
       case 0x50:
         version = Version.LUA50;
         break;
@@ -57,12 +55,13 @@ public class BHeader {
       case 0x53:
         version = Version.LUA53;
         break;
-      default: {
+      default:
         int major = versionNumber >> 4;
         int minor = versionNumber & 0x0F;
         throw new IllegalStateException("The input chunk's Lua version is " + major + "." + minor + "; unluac can only handle Lua 5.0 - Lua 5.3.");
-      }
     }
+    // Parse instruction size
+    parseInstructionSize(buffer);
     lheader = version.getLHeaderType().parse(buffer, this);
     integer = lheader.integer;
     sizeT = lheader.sizeT;
@@ -76,24 +75,33 @@ public class BHeader {
     upvalue = lheader.upvalue;
     function = lheader.function;
     extractor = lheader.extractor;
-    
+
     int upvalues = -1;
-    if(versionNumber >= 0x53) {
+    if (versionNumber >= 0x53) {
       upvalues = 0xFF & buffer.get();
-      if(debug) {
+      if (debug) {
         System.out.println("-- main chunk upvalue count: " + upvalues);
       }
-      // TODO: check this value
     }
     main = function.parse(buffer, this);
-    if(upvalues >= 0) {
-      if(main.numUpvalues != upvalues) {
+    if (upvalues >= 0) {
+      if (main.numUpvalues != upvalues) {
         throw new IllegalStateException("The main chunk has the wrong number of upvalues: " + main.numUpvalues + " (" + upvalues + " expected)");
       }
     }
-    if(main.numUpvalues >= 1 && versionNumber >= 0x52 && (main.upvalues[0].name == null || main.upvalues[0].name.isEmpty())) {
+    if (main.numUpvalues >= 1 && versionNumber >= 0x52 && (main.upvalues[0].name == null || main.upvalues[0].name.isEmpty())) {
       main.upvalues[0].name = "_ENV";
     }
   }
-  
+
+  private void parseInstructionSize(ByteBuffer buffer) {
+    this.instructionSize = buffer.get();  // Read 1 byte for instruction size
+    if (instructionSize != 4 && instructionSize != 8) {
+      throw new IllegalStateException("Unsupported instruction size: " + instructionSize + " bytes");
+    }
+    if (debug) {
+      System.out.println("-- parsed instruction size: " + instructionSize);
+    }
+  }
 }
+
