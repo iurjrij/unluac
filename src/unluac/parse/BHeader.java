@@ -10,6 +10,10 @@ public class BHeader {
   private static final byte[] signature = {
     0x1B, 0x4C, 0x75, 0x61,
   };
+  public class LHeaderParseState {
+    public int instructionSize = 4;  // 默认为 4 字节，适配旧版本
+};
+
 
   public final boolean debug = false;
 
