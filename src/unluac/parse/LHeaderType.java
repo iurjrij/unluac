@@ -100,15 +100,19 @@ abstract public class LHeaderType extends BObjectType<LHeader> {
   }
   
   protected void parse_instruction_size(ByteBuffer buffer, BHeader header, LHeaderParseState s) {
-    // 1 byte instruction size
+    // 读取存储指令大小的字节
     int instructionSize = 0xFF & buffer.get();
-    if(header.debug) {
-      System.out.println("-- instruction size: " + instructionSize);
+    if (header.debug) {
+        System.out.println("-- instruction size: " + instructionSize);
     }
-    if(instructionSize != 4) {
-      throw new IllegalStateException("The input chunk reports an unsupported instruction size: " + instructionSize + " bytes");
+    // 验证指令大小是否为支持的值
+    if (instructionSize != 4 && instructionSize != 8) {
+        throw new IllegalStateException("Unsupported instruction size: " + instructionSize + " bytes");
     }
-  }
+    // 设置解析状态以反映读取的指令大小
+    s.instructionSize = instructionSize;
+}
+
   
   protected void parse_number_size(ByteBuffer buffer, BHeader header, LHeaderParseState s) {
     int lNumberSize = 0xFF & buffer.get();
